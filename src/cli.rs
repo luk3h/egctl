@@ -24,7 +24,7 @@ pub struct Cli {
 	pub command: Commands,
 }
 
-const BUTTON_HELP: &str = "Button: left, right, middle, forward, back, or a number 1-7";
+const BUTTON_HELP: &str = "Button: left, right, middle, forward, back, dpi, wheel-up, wheel-down, or a number 1-8";
 
 #[derive(Subcommand)]
 pub enum Commands {
@@ -109,8 +109,8 @@ pub enum Commands {
 			egctl bind forward key f5\n  \
 			egctl bind back media play-pause\n  \
 			egctl bind middle scroll up\n  \
-			egctl bind 6 cpi 400\n  \
-			egctl bind 7 disable"
+			egctl bind dpi cpi 400\n  \
+			egctl bind dpi disable"
 	)]
 	Bind {
 		#[arg(help = BUTTON_HELP)]
@@ -178,8 +178,9 @@ impl ButtonArg {
 			2 => "middle",
 			3 => "forward",
 			4 => "back",
-			5 => "button 6",
-			_ => "button 7",
+			5 => "dpi",
+			6 => "wheel-up",
+			_ => "wheel-down",
 		}
 	}
 }
@@ -194,13 +195,16 @@ impl FromStr for ButtonArg {
 			"middle" => Some(2),
 			"forward" => Some(3),
 			"back" | "backward" => Some(4),
+			"dpi" | "cpi" => Some(5),
+			"wheel-up" | "scroll-up" => Some(6),
+			"wheel-down" | "scroll-down" => Some(7),
 			other => match other.parse::<usize>() {
 				Ok(n) if (1..=BUTTON_COUNT).contains(&n) => Some(n - 1),
 				_ => None,
 			},
 		};
 		idx.map(Self).ok_or_else(|| {
-			format!("unknown button '{s}'. use left, right, middle, forward, back, or a number 1-{BUTTON_COUNT}")
+			format!("unknown button '{s}'. use left, right, middle, forward, back, dpi, wheel-up, wheel-down, or a number 1-{BUTTON_COUNT}")
 		})
 	}
 }
