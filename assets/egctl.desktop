@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=egctl
+GenericName=Mouse Settings
+Comment=Configure the Endgame Gear OP1 8k v2
+Exec=/home/lukehenzell/.local/bin/egctl-gui
+Icon=egctl
+Terminal=false
+Categories=Settings;HardwareSettings;
+StartupWMClass=egctl

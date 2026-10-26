@@ -400,6 +400,7 @@ fn apply(ui: &MainWindow) -> anyhow::Result<()> {
 
 fn main() -> Result<(), slint::PlatformError> {
     let ui = MainWindow::new()?;
+    slint::set_xdg_app_id("egctl")?;
     load(&ui);
 
     let weak = ui.as_weak();
