@@ -129,7 +129,7 @@ pub struct MouseConfig {
 	pub buttons: [ButtonConfig; BUTTON_COUNT],
 }
 
-const BUTTON_NAMES: [&str; BUTTON_COUNT] = [
+pub const BUTTON_NAMES: [&str; BUTTON_COUNT] = [
 	"Left", "Right", "Middle", "Forward", "Back", "DPI", "Wheel up", "Wheel down",
 ];
 
