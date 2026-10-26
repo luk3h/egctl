@@ -22,6 +22,7 @@ slint::slint! {
         media: int,
         debounce: int,
         spdt: string,
+        summary: string,
     }
 
     component SettingRow inherits HorizontalLayout {
@@ -47,7 +48,21 @@ slint::slint! {
     // Top-down outline of the mouse. Drawn in a 200x320 grid, shown 1.4x larger.
     component MouseView inherits Rectangle {
         in-out property <int> selected;
+        in property <[ButtonRow]> buttons;
         property <float> k: 1.4;
+
+        // Which button the pointer is over (-1 = none). Smaller parts are checked first.
+        property <int> hovered:
+        t-up.has-hover ? 6 :
+        t-down.has-hover ? 7 :
+        t-middle.has-hover ? 2 :
+        t-forward.has-hover ? 3 :
+        t-back.has-hover ? 4 :
+        t-left.has-hover ? 0 :
+        t-right.has-hover ? 1 : -1;
+        // Show the hovered button, or the selected one when nothing is hovered.
+        property <int> shown: hovered >= 0 ? hovered : selected;
+
         width: 280px;
         height: 448px;
 
@@ -67,54 +82,69 @@ slint::slint! {
         Part {
             commands: "M98 10 C55 10 30 42 28 100 L27 128 Q60 138 98 141 Z";
             selected: root.selected == 0;
-            hovered: t-left.has-hover;
+            hovered: root.hovered == 0;
         }
         // 1: Right
         Part {
             commands: "M102 10 C145 10 170 42 172 100 L173 128 Q140 138 102 141 Z";
             selected: root.selected == 1;
-            hovered: t-right.has-hover;
+            hovered: root.hovered == 1;
+        }
+        // 6: Wheel up (above the wheel)
+        Part {
+            commands: "M94 24 L106 24 Q109 24 109 27 L109 37 Q109 40 106 40 L94 40 Q91 40 91 37 L91 27 Q91 24 94 24 Z";
+            selected: root.selected == 6;
+            hovered: root.hovered == 6;
         }
         // 2: Middle (scroll wheel)
         Part {
-            commands: "M92 42 Q92 36 100 36 Q108 36 108 42 L108 86 Q108 92 100 92 Q92 92 92 86 Z";
+            commands: "M92 50 Q92 44 100 44 Q108 44 108 50 L108 78 Q108 84 100 84 Q92 84 92 78 Z";
             selected: root.selected == 2;
-            hovered: t-middle.has-hover;
+            hovered: root.hovered == 2;
         }
-        // 6: Wheel up
+        // 7: Wheel down (below the wheel)
         Part {
-            commands: "M118 38 L134 38 Q137 38 137 41 L137 59 Q137 62 134 62 L118 62 Q115 62 115 59 L115 41 Q115 38 118 38 Z";
-            selected: root.selected == 6;
-            hovered: t-up.has-hover;
-        }
-        // 7: Wheel down
-        Part {
-            commands: "M118 66 L134 66 Q137 66 137 69 L137 87 Q137 90 134 90 L118 90 Q115 90 115 87 L115 69 Q115 66 118 66 Z";
+            commands: "M94 88 L106 88 Q109 88 109 91 L109 101 Q109 104 106 104 L94 104 Q91 104 91 101 L91 91 Q91 88 94 88 Z";
             selected: root.selected == 7;
-            hovered: t-down.has-hover;
+            hovered: root.hovered == 7;
         }
         // 3: Forward (front side button)
         Part {
             commands: "M14 116 Q8 116 8 122 L8 150 Q8 156 14 156 L24 156 L24 116 Z";
             selected: root.selected == 3;
-            hovered: t-forward.has-hover;
+            hovered: root.hovered == 3;
         }
         // 4: Back (rear side button)
         Part {
             commands: "M14 160 Q8 160 8 166 L8 194 Q8 200 14 200 L24 200 L24 160 Z";
             selected: root.selected == 4;
-            hovered: t-back.has-hover;
+            hovered: root.hovered == 4;
         }
 
+        // Arrows on the wheel up/down parts
         Text {
-            x: 115px * root.k; y: 38px * root.k; width: 22px * root.k; height: 24px * root.k;
-            text: "▲"; font-size: 11px; color: #c8cdd4;
+            x: 91px * root.k; y: 24px * root.k; width: 18px * root.k; height: 16px * root.k;
+            text: "▲"; font-size: 9px; color: #c8cdd4;
             horizontal-alignment: center; vertical-alignment: center;
         }
         Text {
-            x: 115px * root.k; y: 66px * root.k; width: 22px * root.k; height: 24px * root.k;
-            text: "▼"; font-size: 11px; color: #c8cdd4;
+            x: 91px * root.k; y: 88px * root.k; width: 18px * root.k; height: 16px * root.k;
+            text: "▼"; font-size: 9px; color: #c8cdd4;
             horizontal-alignment: center; vertical-alignment: center;
+        }
+
+        // Mapping label in the palm area
+        if root.shown >= 0 && root.shown < root.buttons.length : Text {
+            x: 30px * root.k; y: 186px * root.k; width: 140px * root.k;
+            text: root.buttons[root.shown].name;
+            font-size: 16px; font-weight: 700; color: #e8ecf1;
+            horizontal-alignment: center;
+        }
+        if root.shown >= 0 && root.shown < root.buttons.length : Text {
+            x: 30px * root.k; y: 205px * root.k; width: 140px * root.k;
+            text: root.buttons[root.shown].summary;
+            font-size: 13px; color: #5ad16a;
+            horizontal-alignment: center; wrap: word-wrap;
         }
 
         // Click areas. Later ones sit on top of earlier ones.
@@ -129,17 +159,17 @@ slint::slint! {
             clicked => { root.selected = 1; }
         }
         t-middle := TouchArea {
-            x: 90px * root.k; y: 34px * root.k; width: 20px * root.k; height: 60px * root.k;
+            x: 90px * root.k; y: 42px * root.k; width: 20px * root.k; height: 44px * root.k;
             mouse-cursor: pointer;
             clicked => { root.selected = 2; }
         }
         t-up := TouchArea {
-            x: 114px * root.k; y: 36px * root.k; width: 24px * root.k; height: 28px * root.k;
+            x: 89px * root.k; y: 22px * root.k; width: 22px * root.k; height: 20px * root.k;
             mouse-cursor: pointer;
             clicked => { root.selected = 6; }
         }
         t-down := TouchArea {
-            x: 114px * root.k; y: 64px * root.k; width: 24px * root.k; height: 28px * root.k;
+            x: 89px * root.k; y: 86px * root.k; width: 22px * root.k; height: 20px * root.k;
             mouse-cursor: pointer;
             clicked => { root.selected = 7; }
         }
@@ -204,7 +234,7 @@ slint::slint! {
                 VerticalLayout {
                     alignment: start;
                     spacing: 10px;
-                    MouseView { selected <=> root.selected; }
+                    MouseView { selected <=> root.selected; buttons: root.buttons; }
                     Button {
                         text: "DPI button (underside)";
                         primary: root.selected == 5;
@@ -391,6 +421,7 @@ fn to_row(name: &str, b: &ButtonConfig) -> ButtonRow {
         media: 0,
         debounce: b.multiclick as i32,
         spdt: b.spdt.to_string().into(),
+        summary: b.mapping.to_string().into(),
     };
     match b.mapping {
         MappingType::Mouse(k) => {
