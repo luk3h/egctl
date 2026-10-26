@@ -23,6 +23,7 @@ slint::slint! {
         debounce: int,
         spdt: string,
         summary: string,
+        edited: bool,
     }
 
     component SettingRow inherits HorizontalLayout {
@@ -43,6 +44,14 @@ slint::slint! {
         fill: selected ? #2e5c38 : (hovered ? #3a414a : #262b31);
         stroke: selected ? #5ad16a : #8a93a0;
         stroke-width: selected ? 2.5px : 1.5px;
+    }
+
+    // Amber dot marking a button with unsaved changes.
+    component Dot inherits Rectangle {
+        width: 9px;
+        height: 9px;
+        border-radius: 4.5px;
+        background: #e0b050;
     }
 
     // Top-down outline of the mouse. Drawn in a 200x320 grid, shown 1.4x larger.
@@ -66,13 +75,13 @@ slint::slint! {
         width: 280px;
         height: 448px;
 
-        // Body
+        // Body: narrower at the front, wider at the back
         Path {
             width: 280px;
             height: 448px;
             viewbox-width: 200;
             viewbox-height: 320;
-            commands: "M100 8 C150 8 172 40 174 100 L178 220 C180 280 145 312 100 312 C55 312 20 280 22 220 L26 100 C28 40 50 8 100 8 Z";
+            commands: "M100 8 C142 8 162 40 166 100 L178 215 C182 280 146 312 100 312 C54 312 18 280 22 215 L34 100 C38 40 58 8 100 8 Z";
             fill: #1d2126;
             stroke: #8a93a0;
             stroke-width: 1.5px;
@@ -80,13 +89,13 @@ slint::slint! {
 
         // 0: Left
         Part {
-            commands: "M98 10 C55 10 30 42 28 100 L27 128 Q60 138 98 141 Z";
+            commands: "M98 10 C62 10 42 42 38 100 L35 128 Q64 138 98 141 Z";
             selected: root.selected == 0;
             hovered: root.hovered == 0;
         }
         // 1: Right
         Part {
-            commands: "M102 10 C145 10 170 42 172 100 L173 128 Q140 138 102 141 Z";
+            commands: "M102 10 C138 10 158 42 162 100 L165 128 Q136 138 102 141 Z";
             selected: root.selected == 1;
             hovered: root.hovered == 1;
         }
@@ -110,13 +119,13 @@ slint::slint! {
         }
         // 3: Forward (front side button)
         Part {
-            commands: "M14 116 Q8 116 8 122 L8 150 Q8 156 14 156 L24 156 L24 116 Z";
+            commands: "M22 116 Q16 116 16 122 L16 150 Q16 156 22 156 L30 156 L32 116 Z";
             selected: root.selected == 3;
             hovered: root.hovered == 3;
         }
         // 4: Back (rear side button)
         Part {
-            commands: "M14 160 Q8 160 8 166 L8 194 Q8 200 14 200 L24 200 L24 160 Z";
+            commands: "M20 160 Q14 160 14 166 L14 194 Q14 200 20 200 L26 200 L28 160 Z";
             selected: root.selected == 4;
             hovered: root.hovered == 4;
         }
@@ -132,6 +141,15 @@ slint::slint! {
             text: "▼"; font-size: 9px; color: #c8cdd4;
             horizontal-alignment: center; vertical-alignment: center;
         }
+
+        // Unsaved-change dots
+        if root.buttons[0].edited : Dot { x: 68px * root.k - 4.5px; y: 70px * root.k - 4.5px; }
+        if root.buttons[1].edited : Dot { x: 132px * root.k - 4.5px; y: 70px * root.k - 4.5px; }
+        if root.buttons[2].edited : Dot { x: 115px * root.k - 4.5px; y: 64px * root.k - 4.5px; }
+        if root.buttons[3].edited : Dot { x: 24px * root.k - 4.5px; y: 136px * root.k - 4.5px; }
+        if root.buttons[4].edited : Dot { x: 21px * root.k - 4.5px; y: 180px * root.k - 4.5px; }
+        if root.buttons[6].edited : Dot { x: 115px * root.k - 4.5px; y: 32px * root.k - 4.5px; }
+        if root.buttons[7].edited : Dot { x: 115px * root.k - 4.5px; y: 96px * root.k - 4.5px; }
 
         // Mapping label in the palm area
         if root.shown >= 0 && root.shown < root.buttons.length : Text {
@@ -149,12 +167,12 @@ slint::slint! {
 
         // Click areas. Later ones sit on top of earlier ones.
         t-left := TouchArea {
-            x: 28px * root.k; y: 10px * root.k; width: 70px * root.k; height: 130px * root.k;
+            x: 38px * root.k; y: 10px * root.k; width: 60px * root.k; height: 130px * root.k;
             mouse-cursor: pointer;
             clicked => { root.selected = 0; }
         }
         t-right := TouchArea {
-            x: 102px * root.k; y: 10px * root.k; width: 70px * root.k; height: 130px * root.k;
+            x: 102px * root.k; y: 10px * root.k; width: 60px * root.k; height: 130px * root.k;
             mouse-cursor: pointer;
             clicked => { root.selected = 1; }
         }
@@ -174,12 +192,12 @@ slint::slint! {
             clicked => { root.selected = 7; }
         }
         t-forward := TouchArea {
-            x: 4px * root.k; y: 114px * root.k; width: 22px * root.k; height: 44px * root.k;
+            x: 12px * root.k; y: 114px * root.k; width: 22px * root.k; height: 44px * root.k;
             mouse-cursor: pointer;
             clicked => { root.selected = 3; }
         }
         t-back := TouchArea {
-            x: 4px * root.k; y: 158px * root.k; width: 22px * root.k; height: 44px * root.k;
+            x: 10px * root.k; y: 158px * root.k; width: 22px * root.k; height: 44px * root.k;
             mouse-cursor: pointer;
             clicked => { root.selected = 4; }
         }
@@ -191,8 +209,8 @@ slint::slint! {
         preferred-height: 660px;
 
         in property <string> firmware;
-        in property <string> status;
-        in property <bool> status-error;
+        in-out property <string> status;
+        in-out property <bool> status-error;
         in property <string> lod-text;
 
         in-out property <int> polling-index;
@@ -213,9 +231,16 @@ slint::slint! {
         in-out property <[ButtonRow]> buttons;
         in-out property <bool> allow-left-remap;
         in-out property <int> selected: 0;
+        in-out property <bool> dirty: false;
 
         callback refresh();
         callback apply();
+
+        // Called whenever the user changes anything.
+        function mark() {
+            root.dirty = true;
+            root.status-error = false;
+        }
 
         VerticalLayout {
             padding: 16px;
@@ -236,7 +261,7 @@ slint::slint! {
                     spacing: 10px;
                     MouseView { selected <=> root.selected; buttons: root.buttons; }
                     Button {
-                        text: "DPI button (underside)";
+                        text: root.buttons[5].edited ? "DPI button (underside)  •" : "DPI button (underside)";
                         primary: root.selected == 5;
                         clicked => { root.selected = 5; }
                     }
@@ -270,6 +295,7 @@ slint::slint! {
                                             ComboBox {
                                                 model: ["Mouse", "Scroll", "Key", "CPI cycle", "CPI shift", "Media", "Disabled"];
                                                 current-index <=> btn.kind;
+                                                selected(v) => { btn.edited = true; root.mark(); }
                                             }
                                         }
                                         if btn.kind == 0 : SettingRow {
@@ -277,25 +303,39 @@ slint::slint! {
                                             ComboBox {
                                                 model: ["left", "right", "middle", "back", "forward"];
                                                 current-index <=> btn.mouse;
+                                                selected(v) => { btn.edited = true; root.mark(); }
                                             }
                                         }
                                         if btn.kind == 1 : SettingRow {
                                             label: "Direction";
-                                            ComboBox { model: ["up", "down"]; current-index <=> btn.scroll; }
+                                            ComboBox {
+                                                model: ["up", "down"];
+                                                current-index <=> btn.scroll;
+                                                selected(v) => { btn.edited = true; root.mark(); }
+                                            }
                                         }
                                         if btn.kind == 2 : SettingRow {
                                             label: "Key";
-                                            LineEdit { placeholder-text: "e.g. f5 or ctrl+c"; text <=> btn.key; }
+                                            LineEdit {
+                                                placeholder-text: "e.g. f5 or ctrl+c";
+                                                text <=> btn.key;
+                                                edited(t) => { btn.edited = true; root.mark(); }
+                                            }
                                         }
                                         if btn.kind == 4 : SettingRow {
                                             label: "DPI while held";
-                                            SpinBox { minimum: 50; maximum: 26000; step-size: 50; value <=> btn.cpi; }
+                                            SpinBox {
+                                                minimum: 50; maximum: 26000; step-size: 50;
+                                                value <=> btn.cpi;
+                                                edited(v) => { btn.edited = true; root.mark(); }
+                                            }
                                         }
                                         if btn.kind == 5 : SettingRow {
                                             label: "Media key";
                                             ComboBox {
                                                 model: ["play-pause", "next", "previous", "mute", "volume-up", "volume-down", "browser", "explorer"];
                                                 current-index <=> btn.media;
+                                                selected(v) => { btn.edited = true; root.mark(); }
                                             }
                                         }
                                         SettingRow {
@@ -304,6 +344,7 @@ slint::slint! {
                                                 minimum: 0; maximum: 25;
                                                 enabled: btn.spdt == "off";
                                                 value <=> btn.debounce;
+                                                edited(v) => { btn.edited = true; root.mark(); }
                                             }
                                         }
                                         if btn.spdt != "off" : Text {
@@ -333,19 +374,20 @@ slint::slint! {
                                 ComboBox {
                                     model: ["1000 Hz", "2000 Hz", "4000 Hz", "8000 Hz"];
                                     current-index <=> root.polling-index;
+                                    selected(v) => { root.mark(); }
                                 }
                             }
                             SettingRow {
                                 label: "Lift-off distance";
                                 Text { text: root.lod-text + "  (read-only for now)"; vertical-alignment: center; }
                             }
-                            Switch { text: "Angle snapping"; checked <=> root.angle-snapping; }
-                            Switch { text: "Ripple control"; checked <=> root.ripple-control; }
-                            Switch { text: "Motion sync"; checked <=> root.motion-sync; }
-                            Switch { text: "Glass mode"; checked <=> root.glass-mode; }
-                            Switch { text: "Force max fps"; checked <=> root.force-max-fps; }
-                            Switch { text: "Slamclick filter"; checked <=> root.slamclick-filter; }
-                            Switch { text: "Jitter filter"; checked <=> root.jitter-filter; }
+                            Switch { text: "Angle snapping"; checked <=> root.angle-snapping; toggled => { root.mark(); } }
+                            Switch { text: "Ripple control"; checked <=> root.ripple-control; toggled => { root.mark(); } }
+                            Switch { text: "Motion sync"; checked <=> root.motion-sync; toggled => { root.mark(); } }
+                            Switch { text: "Glass mode"; checked <=> root.glass-mode; toggled => { root.mark(); } }
+                            Switch { text: "Force max fps"; checked <=> root.force-max-fps; toggled => { root.mark(); } }
+                            Switch { text: "Slamclick filter"; checked <=> root.slamclick-filter; toggled => { root.mark(); } }
+                            Switch { text: "Jitter filter"; checked <=> root.jitter-filter; toggled => { root.mark(); } }
                         }
                     }
 
@@ -355,11 +397,11 @@ slint::slint! {
                             padding: 16px;
                             spacing: 10px;
                             alignment: start;
-                            SettingRow { label: "Active levels"; SpinBox { minimum: 1; maximum: 4; value <=> root.cpi-levels; } }
-                            SettingRow { label: "CPI 1"; SpinBox { minimum: 50; maximum: 26000; step-size: 50; value <=> root.cpi1; } }
-                            SettingRow { label: "CPI 2"; SpinBox { minimum: 50; maximum: 26000; step-size: 50; value <=> root.cpi2; } }
-                            SettingRow { label: "CPI 3"; SpinBox { minimum: 50; maximum: 26000; step-size: 50; value <=> root.cpi3; } }
-                            SettingRow { label: "CPI 4"; SpinBox { minimum: 50; maximum: 26000; step-size: 50; value <=> root.cpi4; } }
+                            SettingRow { label: "Active levels"; SpinBox { minimum: 1; maximum: 4; value <=> root.cpi-levels; edited(v) => { root.mark(); } } }
+                            SettingRow { label: "CPI 1"; SpinBox { minimum: 50; maximum: 26000; step-size: 50; value <=> root.cpi1; edited(v) => { root.mark(); } } }
+                            SettingRow { label: "CPI 2"; SpinBox { minimum: 50; maximum: 26000; step-size: 50; value <=> root.cpi2; edited(v) => { root.mark(); } } }
+                            SettingRow { label: "CPI 3"; SpinBox { minimum: 50; maximum: 26000; step-size: 50; value <=> root.cpi3; edited(v) => { root.mark(); } } }
+                            SettingRow { label: "CPI 4"; SpinBox { minimum: 50; maximum: 26000; step-size: 50; value <=> root.cpi4; edited(v) => { root.mark(); } } }
                         }
                     }
                 }
@@ -369,14 +411,14 @@ slint::slint! {
             HorizontalLayout {
                 spacing: 8px;
                 Text {
-                    text: root.status;
-                    color: root.status-error ? #e05050 : #50c060;
+                    text: root.status-error ? root.status : (root.dirty ? "Unsaved changes" : root.status);
+                    color: root.status-error ? #e05050 : (root.dirty ? #e0b050 : #50c060);
                     wrap: word-wrap;
                     vertical-alignment: center;
                     horizontal-stretch: 1;
                 }
                 Button { text: "Revert"; clicked => { root.refresh(); } }
-                Button { text: "Apply"; primary: true; clicked => { root.apply(); } }
+                Button { text: "Apply"; primary: true; enabled: root.dirty; clicked => { root.apply(); } }
             }
         }
     }
@@ -422,6 +464,7 @@ fn to_row(name: &str, b: &ButtonConfig) -> ButtonRow {
         debounce: b.multiclick as i32,
         spdt: b.spdt.to_string().into(),
         summary: b.mapping.to_string().into(),
+        edited: false,
     };
     match b.mapping {
         MappingType::Mouse(k) => {
@@ -536,6 +579,7 @@ fn load(ui: &MainWindow) -> bool {
     match read_mouse() {
         Ok((firmware, config)) => {
             fill(ui, firmware, &config);
+            ui.set_dirty(false);
             ui.set_status_error(false);
             ui.set_status("Loaded from mouse".into());
             true
