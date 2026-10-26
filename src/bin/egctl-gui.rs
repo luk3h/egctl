@@ -1,22 +1,27 @@
+use anyhow::Context;
+use slint::Model;
+
 use egctl::device::Device;
-use egctl::types::config::BUTTON_NAMES;
-use egctl::types::{validate_dpi, MouseConfig, PollingRate, SpdtMode};
+use egctl::types::config::{ButtonConfig, BUTTON_NAMES};
+use egctl::types::keys::format_key;
+use egctl::types::{
+    key_code, modifier_bit, validate_dpi, MappingType, MediaKey, MouseConfig, MouseKey,
+    PollingRate, ScrollDirection, SpdtMode,
+};
 
 slint::slint! {
-    import { Button, GroupBox, VerticalBox, ComboBox, Switch, SpinBox } from "std-widgets.slint";
+    import { Button, GroupBox, VerticalBox, ComboBox, Switch, SpinBox, LineEdit } from "std-widgets.slint";
 
-    export struct Row {
-        label: string,
-        value: string,
-    }
-
-    component RowList inherits VerticalLayout {
-        in property <[Row]> rows;
-        spacing: 4px;
-        for row in root.rows : HorizontalLayout {
-            Text { text: row.label; width: 140px; color: #a0a0a0; }
-            Text { text: row.value; }
-        }
+    export struct ButtonRow {
+        name: string,
+        kind: int,
+        mouse: int,
+        scroll: int,
+        key: string,
+        cpi: int,
+        media: int,
+        debounce: int,
+        spdt: string,
     }
 
     component SettingRow inherits HorizontalLayout {
@@ -28,14 +33,13 @@ slint::slint! {
 
     export component MainWindow inherits Window {
         title: "egctl";
-        preferred-width: 460px;
-        preferred-height: 900px;
+        preferred-width: 640px;
+        preferred-height: 1000px;
 
         in property <string> firmware;
         in property <string> status;
         in property <bool> status-error;
         in property <string> lod-text;
-        in property <[Row]> buttons;
 
         in-out property <int> polling-index;
         in-out property <bool> angle-snapping;
@@ -52,20 +56,14 @@ slint::slint! {
         in-out property <int> cpi3;
         in-out property <int> cpi4;
 
+        in-out property <[ButtonRow]> buttons;
+        in-out property <bool> allow-left-remap;
+
         callback refresh();
         callback apply();
 
         VerticalBox {
-            HorizontalLayout {
-                spacing: 8px;
-                Text {
-                    text: "Endgame Gear OP1 8k v2";
-                    font-size: 18px;
-                    font-weight: 700;
-                    vertical-alignment: center;
-                    horizontal-stretch: 1;
-                }
-            }
+            Text { text: "Endgame Gear OP1 8k v2"; font-size: 18px; font-weight: 700; }
             Text { text: root.firmware; color: #a0a0a0; }
 
             GroupBox {
@@ -106,8 +104,57 @@ slint::slint! {
             }
 
             GroupBox {
-                title: "Buttons (read-only for now)";
-                RowList { rows: root.buttons; }
+                title: "Buttons";
+                VerticalLayout {
+                    spacing: 6px;
+                    HorizontalLayout {
+                        spacing: 8px;
+                        Text { text: "Button"; width: 90px; color: #a0a0a0; }
+                        Text { text: "Action"; width: 130px; color: #a0a0a0; }
+                        Text { text: "Setting"; horizontal-stretch: 1; color: #a0a0a0; }
+                        Text { text: "Debounce"; width: 90px; color: #a0a0a0; }
+                    }
+                    for btn in root.buttons : HorizontalLayout {
+                        spacing: 8px;
+                        Text { text: btn.name; width: 90px; vertical-alignment: center; }
+                        ComboBox {
+                            width: 130px;
+                            model: ["Mouse", "Scroll", "Key", "CPI cycle", "CPI shift", "Media", "Disabled"];
+                            current-index <=> btn.kind;
+                        }
+                        HorizontalLayout {
+                            horizontal-stretch: 1;
+                            if btn.kind == 0 : ComboBox {
+                                model: ["left", "right", "middle", "back", "forward"];
+                                current-index <=> btn.mouse;
+                            }
+                            if btn.kind == 1 : ComboBox {
+                                model: ["up", "down"];
+                                current-index <=> btn.scroll;
+                            }
+                            if btn.kind == 2 : LineEdit {
+                                placeholder-text: "e.g. f5 or ctrl+c";
+                                text <=> btn.key;
+                            }
+                            if btn.kind == 4 : SpinBox {
+                                minimum: 50; maximum: 26000; step-size: 50;
+                                value <=> btn.cpi;
+                            }
+                            if btn.kind == 5 : ComboBox {
+                                model: ["play-pause", "next", "previous", "mute", "volume-up", "volume-down", "browser", "explorer"];
+                                current-index <=> btn.media;
+                            }
+                            if btn.kind == 3 || btn.kind == 6 : Text { text: "—"; vertical-alignment: center; }
+                        }
+                        SpinBox {
+                            width: 90px;
+                            minimum: 0; maximum: 25;
+                            enabled: btn.spdt == "off";
+                            value <=> btn.debounce;
+                        }
+                    }
+                    Switch { text: "Allow remapping the left button"; checked <=> root.allow-left-remap; }
+                }
             }
 
             HorizontalLayout {
@@ -126,6 +173,25 @@ slint::slint! {
     }
 }
 
+// Order must match the dropdowns in the UI above.
+const MOUSE_KEYS: [MouseKey; 5] = [
+    MouseKey::Left,
+MouseKey::Right,
+MouseKey::Middle,
+MouseKey::Back,
+MouseKey::Forward,
+];
+const MEDIA_KEYS: [MediaKey; 8] = [
+    MediaKey::PlayPause,
+MediaKey::Next,
+MediaKey::Previous,
+MediaKey::Mute,
+MediaKey::VolumeUp,
+MediaKey::VolumeDown,
+MediaKey::Browser,
+MediaKey::Explorer,
+];
+
 /// Read the mouse. Read-only.
 fn read_mouse() -> anyhow::Result<(String, MouseConfig)> {
     let dev = Device::open()?;
@@ -134,25 +200,93 @@ fn read_mouse() -> anyhow::Result<(String, MouseConfig)> {
     Ok((format!("Firmware {minor:x}.{major:x}"), config))
 }
 
-fn buttons_model(c: &MouseConfig) -> slint::ModelRc<Row> {
-    let rows: Vec<Row> = c
-    .buttons
-    .iter()
-    .zip(BUTTON_NAMES.iter())
-    .map(|(b, name)| {
-        let mut value = b.mapping.to_string();
-        if b.spdt != SpdtMode::Off {
-            value += &format!("  ·  SPDT {}", b.spdt);
-        } else if b.multiclick > 0 {
-            value += &format!("  ·  debounce {}", b.multiclick);
+/// Turn one button's config into a row for the window.
+fn to_row(name: &str, b: &ButtonConfig) -> ButtonRow {
+    let mut row = ButtonRow {
+        name: name.into(),
+        kind: 6,
+        mouse: 0,
+        scroll: 0,
+        key: "".into(),
+        cpi: 800,
+        media: 0,
+        debounce: b.multiclick as i32,
+        spdt: b.spdt.to_string().into(),
+    };
+    match b.mapping {
+        MappingType::Mouse(k) => {
+            row.kind = 0;
+            row.mouse = MOUSE_KEYS.iter().position(|m| *m == k).unwrap_or(0) as i32;
         }
-        Row {
-            label: (*name).into(),
-         value: value.into(),
+        MappingType::Scroll(d) => {
+            row.kind = 1;
+            row.scroll = if d == ScrollDirection::Down { 1 } else { 0 };
         }
+        MappingType::Keyboard { modifiers, code } => {
+            row.kind = 2;
+            row.key = format_key(modifiers, code).into();
+        }
+        MappingType::CpiLoop => row.kind = 3,
+        MappingType::Cpi { x, .. } => {
+            row.kind = 4;
+            row.cpi = x as i32;
+        }
+        MappingType::Media(k) => {
+            row.kind = 5;
+            row.media = MEDIA_KEYS.iter().position(|m| *m == k).unwrap_or(0) as i32;
+        }
+        MappingType::Disable => row.kind = 6,
+    }
+    row
+}
+
+/// Parse text like "f5", "ctrl+c" or "ctrl+shift+esc" into (modifiers, key code).
+fn parse_key(s: &str) -> anyhow::Result<(u8, u8)> {
+    let mut modifiers = 0u8;
+    let mut code = 0u8;
+    for part in s.split('+').map(str::trim).filter(|p| !p.is_empty()) {
+        if let Some(bit) = modifier_bit(part) {
+            modifiers |= bit;
+        } else if let Some(c) = key_code(part) {
+            if code != 0 {
+                anyhow::bail!("only one non-modifier key allowed");
+            }
+            code = c;
+        } else {
+            anyhow::bail!("unknown key '{part}' (run `egctl keys` for the list)");
+        }
+    }
+    if modifiers == 0 && code == 0 {
+        anyhow::bail!("no key entered");
+    }
+    Ok((modifiers, code))
+}
+
+/// Turn a row from the window back into a button mapping.
+fn mapping_from_row(r: &ButtonRow) -> anyhow::Result<MappingType> {
+    Ok(match r.kind {
+        0 => MappingType::Mouse(MOUSE_KEYS[r.mouse.clamp(0, 4) as usize]),
+       1 => MappingType::Scroll(if r.scroll == 1 {
+           ScrollDirection::Down
+       } else {
+           ScrollDirection::Up
+       }),
+       2 => {
+           let (modifiers, code) = parse_key(&r.key)?;
+           MappingType::Keyboard { modifiers, code }
+       }
+       3 => MappingType::CpiLoop,
+       4 => {
+           let dpi = validate_dpi(r.cpi.clamp(50, 26000) as u16)?;
+           MappingType::Cpi {
+               xy_split: false,
+               x: dpi,
+               y: dpi,
+           }
+       }
+       5 => MappingType::Media(MEDIA_KEYS[r.media.clamp(0, 7) as usize]),
+       _ => MappingType::Disable,
     })
-    .collect();
-    slint::ModelRc::new(slint::VecModel::from(rows))
 }
 
 /// Copy the mouse's settings into the window.
@@ -177,7 +311,14 @@ fn fill(ui: &MainWindow, firmware: String, c: &MouseConfig) {
     ui.set_cpi2(c.cpis[1].x as i32);
     ui.set_cpi3(c.cpis[2].x as i32);
     ui.set_cpi4(c.cpis[3].x as i32);
-    ui.set_buttons(buttons_model(c));
+
+    let rows: Vec<ButtonRow> = c
+    .buttons
+    .iter()
+    .zip(BUTTON_NAMES.iter())
+    .map(|(b, name)| to_row(name, b))
+    .collect();
+    ui.set_buttons(slint::ModelRc::new(slint::VecModel::from(rows)));
 }
 
 /// Reload from the mouse. Returns true if it worked.
@@ -197,8 +338,26 @@ fn load(ui: &MainWindow) -> bool {
     }
 }
 
-/// Read fresh, change only what the window shows, write back.
+/// Validate everything, then read fresh, change only what the window shows, write back.
 fn apply(ui: &MainWindow) -> anyhow::Result<()> {
+    // 1. Check every button row BEFORE touching the mouse.
+    let model = ui.get_buttons();
+    let mut new_buttons = Vec::new();
+    for i in 0..model.row_count() {
+        let r = model.row_data(i).context("missing button row")?;
+        let mapping = mapping_from_row(&r).with_context(|| format!("{} button", r.name))?;
+        new_buttons.push((mapping, r.debounce));
+    }
+
+    // 2. Safety lock: don't let the left button stop being left-click by accident.
+    let left = new_buttons.first().map(|(m, _)| *m);
+    if !ui.get_allow_left_remap() && left != Some(MappingType::Mouse(MouseKey::Left)) {
+        anyhow::bail!(
+            "Left button is no longer left-click. Tick \"Allow remapping the left button\" if you really mean it."
+        );
+    }
+
+    // 3. Read fresh and apply.
     let dev = Device::open()?;
     let mut c = dev.read_config()?;
 
@@ -228,6 +387,13 @@ fn apply(ui: &MainWindow) -> anyhow::Result<()> {
         c.cpis[i].y = dpi;
     }
 
+    for (i, (mapping, debounce)) in new_buttons.into_iter().enumerate().take(c.buttons.len()) {
+        c.buttons[i].mapping = mapping;
+        if c.buttons[i].spdt == SpdtMode::Off {
+            c.buttons[i].multiclick = debounce.clamp(0, 25) as u8;
+        }
+    }
+
     dev.write_config(&c)?;
     Ok(())
 }
@@ -254,7 +420,7 @@ fn main() -> Result<(), slint::PlatformError> {
                 }
                 Err(e) => {
                     ui.set_status_error(true);
-                    ui.set_status(format!("Save failed: {e:#}").into());
+                    ui.set_status(format!("Not saved: {e:#}").into());
                 }
             }
         }
