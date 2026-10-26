@@ -8,6 +8,7 @@ use egctl::types::{key_code, modifier_bit};
 #[derive(Parser)]
 #[command(
 	name = "egctl",
+version,
 	about = "Configure the Endgame Gear OP1 8k v2 mouse on Linux",
 	arg_required_else_help = true,
 	after_help = "Examples:\n  \
@@ -16,7 +17,7 @@ use egctl::types::{key_code, modifier_bit};
 		egctl dpi 3200 --level 2         set DPI for level 2\n  \
 		egctl rate 8000                  set polling rate to 8000 Hz\n  \
 		egctl bind forward key f5        bind the forward button to F5\n  \
-		egctl bind 6 media mute          bind button 6 to mute\n  \
+		egctl bind dpi media mute          bind the DPI button to mute\n  \
 		egctl keys                       list key names for 'bind ... key'"
 )]
 pub struct Cli {
