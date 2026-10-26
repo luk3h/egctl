@@ -47,7 +47,6 @@ sudo pacman -S rust git systemd-libs fontconfig libxkbcommon pkgconf
 ```
 git clone https://github.com/luk3h/egctl.git
 cd egctl
-git checkout gui
 ./install.sh
 ```
 
