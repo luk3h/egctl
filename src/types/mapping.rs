@@ -174,7 +174,10 @@ impl MappingType {
 				v[1] = code;
 				MAP_KEYBOARD
 			}
-			Self::CpiLoop => MAP_CPI_LOOP,
+			Self::CpiLoop => {
+				v[0] = CPI_LOOP_VALUE;
+				MAP_CPI_LOOP
+			}
 			Self::Cpi { xy_split, x, y } => {
 				v[0] = xy_split as u8;
 				v[1..3].copy_from_slice(&x.to_le_bytes());
