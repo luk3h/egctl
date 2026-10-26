@@ -5,7 +5,7 @@ pub const COMMAND_SIZE: usize = 64;
 pub const CONFIG_SIZE: usize = 1041;
 
 pub const CPI_COUNT: usize = 4;
-pub const BUTTON_COUNT: usize = 7;
+pub const BUTTON_COUNT: usize = 8;
 
 pub const OP_STORE_CONFIG: u16 = 0x11a0;
 pub const OP_LOAD_CONFIG: u16 = 0x12a1;
@@ -28,7 +28,7 @@ pub const OFF_RIPPLE_CONTROL: usize = 27;
 pub const OFF_MOTION_SYNC: usize = 28;
 pub const OFF_CPI_LEVELS: usize = 30;
 pub const OFF_CPIS: usize = 51;
-pub const OFF_BUTTONS: usize = 77;
+pub const OFF_BUTTONS: usize = 71;
 
 pub const OFF_GLASS_MODE: usize = 127;
 pub const OFF_FORCE_MAX_FPS: usize = 129;
@@ -92,6 +92,6 @@ mod tests {
 	fn button_offsets_fit_in_config() {
 		let end = OFF_BUTTONS + BUTTON_COUNT * BUTTON_STRUCT_SIZE;
 		assert!(end <= CONFIG_SIZE);
-		assert_eq!(end, 126);
+		assert_eq!(end, 127);
 	}
 }

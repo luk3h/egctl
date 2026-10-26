@@ -130,7 +130,7 @@ pub struct MouseConfig {
 }
 
 const BUTTON_NAMES: [&str; BUTTON_COUNT] = [
-	"Left", "Right", "Middle", "Forward", "Back", "Button 6", "Button 7",
+	"Left", "Right", "Middle", "Forward", "Back", "DPI", "Wheel up", "Wheel down",
 ];
 
 impl MouseConfig {
@@ -149,8 +149,8 @@ impl MouseConfig {
 
 		let buttons: [ButtonConfig; BUTTON_COUNT] = std::array::from_fn(|i| {
 			let base = OFF_BUTTONS + i * BUTTON_STRUCT_SIZE;
-			let (spdt, multiclick) = SpdtMode::from_byte(buf[base]);
-			let mapping = MappingType::from_bytes(buf[base + 1] as i8, &buf[base + 2..base + 7]);
+			let mapping = MappingType::from_bytes(buf[base] as i8, &buf[base + 1..base + 6]);
+			let (spdt, multiclick) = SpdtMode::from_byte(buf[base + 6]);
 			ButtonConfig {
 				spdt,
 				multiclick,
@@ -210,10 +210,10 @@ impl MouseConfig {
 
 		for i in 0..BUTTON_COUNT {
 			let base = OFF_BUTTONS + i * BUTTON_STRUCT_SIZE;
-			buf[base] = self.buttons[i].spdt.to_byte(self.buttons[i].multiclick);
 			let (type_byte, value_bytes) = self.buttons[i].mapping.to_bytes();
-			buf[base + 1] = type_byte as u8;
-			buf[base + 2..base + 7].copy_from_slice(&value_bytes);
+			buf[base] = type_byte as u8;
+			buf[base + 1..base + 6].copy_from_slice(&value_bytes);
+			buf[base + 6] = self.buttons[i].spdt.to_byte(self.buttons[i].multiclick);
 		}
 
 		buf
@@ -306,13 +306,14 @@ mod tests {
 			(0, MAP_MOUSE as u8, MOUSE_FORWARD),
 			(0, MAP_MOUSE as u8, MOUSE_BACK),
 			(0, MAP_CPI_LOOP as u8, 0),
+			(0, MAP_SCROLL as u8, 1),
 			(0, MAP_DISABLE as u8, 0),
 		];
 		for (i, (spdt, ty, val)) in buttons.iter().enumerate() {
 			let base = OFF_BUTTONS + i * BUTTON_STRUCT_SIZE;
-			buf[base] = *spdt;
-			buf[base + 1] = *ty;
-			buf[base + 2] = *val;
+			buf[base] = *ty;
+			buf[base + 1] = *val;
+			buf[base + 6] = *spdt;
 		}
 		buf
 	}
