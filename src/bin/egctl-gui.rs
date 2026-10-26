@@ -10,7 +10,7 @@ use egctl::types::{
 };
 
 slint::slint! {
-    import { Button, GroupBox, VerticalBox, ComboBox, Switch, SpinBox, LineEdit } from "std-widgets.slint";
+    import { Button, ComboBox, Switch, SpinBox, LineEdit, TabWidget } from "std-widgets.slint";
 
     export struct ButtonRow {
         name: string,
@@ -27,14 +27,138 @@ slint::slint! {
     component SettingRow inherits HorizontalLayout {
         in property <string> label;
         spacing: 8px;
-        Text { text: root.label; width: 140px; color: #a0a0a0; vertical-alignment: center; }
+        Text { text: root.label; width: 120px; color: #a0a0a0; vertical-alignment: center; }
         @children
+    }
+
+    // One clickable part of the mouse drawing.
+    component Part inherits Path {
+        in property <bool> selected;
+        in property <bool> hovered;
+        width: 280px;
+        height: 448px;
+        viewbox-width: 200;
+        viewbox-height: 320;
+        fill: selected ? #2e5c38 : (hovered ? #3a414a : #262b31);
+        stroke: selected ? #5ad16a : #8a93a0;
+        stroke-width: selected ? 2.5px : 1.5px;
+    }
+
+    // Top-down outline of the mouse. Drawn in a 200x320 grid, shown 1.4x larger.
+    component MouseView inherits Rectangle {
+        in-out property <int> selected;
+        property <float> k: 1.4;
+        width: 280px;
+        height: 448px;
+
+        // Body
+        Path {
+            width: 280px;
+            height: 448px;
+            viewbox-width: 200;
+            viewbox-height: 320;
+            commands: "M100 8 C150 8 172 40 174 100 L178 220 C180 280 145 312 100 312 C55 312 20 280 22 220 L26 100 C28 40 50 8 100 8 Z";
+            fill: #1d2126;
+            stroke: #8a93a0;
+            stroke-width: 1.5px;
+        }
+
+        // 0: Left
+        Part {
+            commands: "M98 10 C55 10 30 42 28 100 L27 128 Q60 138 98 141 Z";
+            selected: root.selected == 0;
+            hovered: t-left.has-hover;
+        }
+        // 1: Right
+        Part {
+            commands: "M102 10 C145 10 170 42 172 100 L173 128 Q140 138 102 141 Z";
+            selected: root.selected == 1;
+            hovered: t-right.has-hover;
+        }
+        // 2: Middle (scroll wheel)
+        Part {
+            commands: "M92 42 Q92 36 100 36 Q108 36 108 42 L108 86 Q108 92 100 92 Q92 92 92 86 Z";
+            selected: root.selected == 2;
+            hovered: t-middle.has-hover;
+        }
+        // 6: Wheel up
+        Part {
+            commands: "M118 38 L134 38 Q137 38 137 41 L137 59 Q137 62 134 62 L118 62 Q115 62 115 59 L115 41 Q115 38 118 38 Z";
+            selected: root.selected == 6;
+            hovered: t-up.has-hover;
+        }
+        // 7: Wheel down
+        Part {
+            commands: "M118 66 L134 66 Q137 66 137 69 L137 87 Q137 90 134 90 L118 90 Q115 90 115 87 L115 69 Q115 66 118 66 Z";
+            selected: root.selected == 7;
+            hovered: t-down.has-hover;
+        }
+        // 3: Forward (front side button)
+        Part {
+            commands: "M14 116 Q8 116 8 122 L8 150 Q8 156 14 156 L24 156 L24 116 Z";
+            selected: root.selected == 3;
+            hovered: t-forward.has-hover;
+        }
+        // 4: Back (rear side button)
+        Part {
+            commands: "M14 160 Q8 160 8 166 L8 194 Q8 200 14 200 L24 200 L24 160 Z";
+            selected: root.selected == 4;
+            hovered: t-back.has-hover;
+        }
+
+        Text {
+            x: 115px * root.k; y: 38px * root.k; width: 22px * root.k; height: 24px * root.k;
+            text: "▲"; font-size: 11px; color: #c8cdd4;
+            horizontal-alignment: center; vertical-alignment: center;
+        }
+        Text {
+            x: 115px * root.k; y: 66px * root.k; width: 22px * root.k; height: 24px * root.k;
+            text: "▼"; font-size: 11px; color: #c8cdd4;
+            horizontal-alignment: center; vertical-alignment: center;
+        }
+
+        // Click areas. Later ones sit on top of earlier ones.
+        t-left := TouchArea {
+            x: 28px * root.k; y: 10px * root.k; width: 70px * root.k; height: 130px * root.k;
+            mouse-cursor: pointer;
+            clicked => { root.selected = 0; }
+        }
+        t-right := TouchArea {
+            x: 102px * root.k; y: 10px * root.k; width: 70px * root.k; height: 130px * root.k;
+            mouse-cursor: pointer;
+            clicked => { root.selected = 1; }
+        }
+        t-middle := TouchArea {
+            x: 90px * root.k; y: 34px * root.k; width: 20px * root.k; height: 60px * root.k;
+            mouse-cursor: pointer;
+            clicked => { root.selected = 2; }
+        }
+        t-up := TouchArea {
+            x: 114px * root.k; y: 36px * root.k; width: 24px * root.k; height: 28px * root.k;
+            mouse-cursor: pointer;
+            clicked => { root.selected = 6; }
+        }
+        t-down := TouchArea {
+            x: 114px * root.k; y: 64px * root.k; width: 24px * root.k; height: 28px * root.k;
+            mouse-cursor: pointer;
+            clicked => { root.selected = 7; }
+        }
+        t-forward := TouchArea {
+            x: 4px * root.k; y: 114px * root.k; width: 22px * root.k; height: 44px * root.k;
+            mouse-cursor: pointer;
+            clicked => { root.selected = 3; }
+        }
+        t-back := TouchArea {
+            x: 4px * root.k; y: 158px * root.k; width: 22px * root.k; height: 44px * root.k;
+            mouse-cursor: pointer;
+            clicked => { root.selected = 4; }
+        }
     }
 
     export component MainWindow inherits Window {
         title: "egctl";
-        preferred-width: 640px;
-        preferred-height: 1000px;
+        preferred-width: 920px;
+        preferred-height: 660px;
 
         in property <string> firmware;
         in property <string> status;
@@ -58,105 +182,160 @@ slint::slint! {
 
         in-out property <[ButtonRow]> buttons;
         in-out property <bool> allow-left-remap;
+        in-out property <int> selected: 0;
 
         callback refresh();
         callback apply();
 
-        VerticalBox {
-            Text { text: "Endgame Gear OP1 8k v2"; font-size: 18px; font-weight: 700; }
-            Text { text: root.firmware; color: #a0a0a0; }
+        VerticalLayout {
+            padding: 16px;
+            spacing: 12px;
 
-            GroupBox {
-                title: "General";
+            VerticalLayout {
+                Text { text: "Endgame Gear OP1 8k v2"; font-size: 20px; font-weight: 700; }
+                Text { text: root.firmware; color: #a0a0a0; }
+            }
+
+            HorizontalLayout {
+                spacing: 24px;
+                vertical-stretch: 1;
+
+                // Left: the mouse
                 VerticalLayout {
-                    spacing: 6px;
-                    SettingRow {
-                        label: "Polling rate";
-                        ComboBox {
-                            model: ["1000 Hz", "2000 Hz", "4000 Hz", "8000 Hz"];
-                            current-index <=> root.polling-index;
+                    alignment: start;
+                    spacing: 10px;
+                    MouseView { selected <=> root.selected; }
+                    Button {
+                        text: "DPI button (underside)";
+                        primary: root.selected == 5;
+                        clicked => { root.selected = 5; }
+                    }
+                    Text {
+                        text: "Click a button on the mouse to edit it";
+                        color: #a0a0a0;
+                        horizontal-alignment: center;
+                    }
+                }
+
+                // Right: settings
+                TabWidget {
+                    horizontal-stretch: 1;
+
+                    Tab {
+                        title: "Buttons";
+                        VerticalLayout {
+                            padding: 16px;
+                            spacing: 12px;
+                            alignment: start;
+
+                            // Only the selected button's editor is shown.
+                            VerticalLayout {
+                                spacing: 0px;
+                                for btn[i] in root.buttons : VerticalLayout {
+                                    if i == root.selected : VerticalLayout {
+                                        spacing: 10px;
+                                        Text { text: btn.name; font-size: 18px; font-weight: 700; }
+                                        SettingRow {
+                                            label: "Action";
+                                            ComboBox {
+                                                model: ["Mouse", "Scroll", "Key", "CPI cycle", "CPI shift", "Media", "Disabled"];
+                                                current-index <=> btn.kind;
+                                            }
+                                        }
+                                        if btn.kind == 0 : SettingRow {
+                                            label: "Mouse button";
+                                            ComboBox {
+                                                model: ["left", "right", "middle", "back", "forward"];
+                                                current-index <=> btn.mouse;
+                                            }
+                                        }
+                                        if btn.kind == 1 : SettingRow {
+                                            label: "Direction";
+                                            ComboBox { model: ["up", "down"]; current-index <=> btn.scroll; }
+                                        }
+                                        if btn.kind == 2 : SettingRow {
+                                            label: "Key";
+                                            LineEdit { placeholder-text: "e.g. f5 or ctrl+c"; text <=> btn.key; }
+                                        }
+                                        if btn.kind == 4 : SettingRow {
+                                            label: "DPI while held";
+                                            SpinBox { minimum: 50; maximum: 26000; step-size: 50; value <=> btn.cpi; }
+                                        }
+                                        if btn.kind == 5 : SettingRow {
+                                            label: "Media key";
+                                            ComboBox {
+                                                model: ["play-pause", "next", "previous", "mute", "volume-up", "volume-down", "browser", "explorer"];
+                                                current-index <=> btn.media;
+                                            }
+                                        }
+                                        SettingRow {
+                                            label: "Debounce";
+                                            SpinBox {
+                                                minimum: 0; maximum: 25;
+                                                enabled: btn.spdt == "off";
+                                                value <=> btn.debounce;
+                                            }
+                                        }
+                                        if btn.spdt != "off" : Text {
+                                            text: "Uses SPDT mode (" + btn.spdt + "), so debounce doesn't apply.";
+                                            color: #a0a0a0;
+                                            wrap: word-wrap;
+                                        }
+                                    }
+                                }
+                            }
+
+                            if root.selected == 0 : Switch {
+                                text: "Allow remapping the left button";
+                                checked <=> root.allow-left-remap;
+                            }
                         }
                     }
-                    SettingRow {
-                        label: "Lift-off distance";
-                        Text { text: root.lod-text + "  (read-only for now)"; vertical-alignment: center; }
+
+                    Tab {
+                        title: "Performance";
+                        VerticalLayout {
+                            padding: 16px;
+                            spacing: 10px;
+                            alignment: start;
+                            SettingRow {
+                                label: "Polling rate";
+                                ComboBox {
+                                    model: ["1000 Hz", "2000 Hz", "4000 Hz", "8000 Hz"];
+                                    current-index <=> root.polling-index;
+                                }
+                            }
+                            SettingRow {
+                                label: "Lift-off distance";
+                                Text { text: root.lod-text + "  (read-only for now)"; vertical-alignment: center; }
+                            }
+                            Switch { text: "Angle snapping"; checked <=> root.angle-snapping; }
+                            Switch { text: "Ripple control"; checked <=> root.ripple-control; }
+                            Switch { text: "Motion sync"; checked <=> root.motion-sync; }
+                            Switch { text: "Glass mode"; checked <=> root.glass-mode; }
+                            Switch { text: "Force max fps"; checked <=> root.force-max-fps; }
+                            Switch { text: "Slamclick filter"; checked <=> root.slamclick-filter; }
+                            Switch { text: "Jitter filter"; checked <=> root.jitter-filter; }
+                        }
                     }
-                    Switch { text: "Angle snapping"; checked <=> root.angle-snapping; }
-                    Switch { text: "Ripple control"; checked <=> root.ripple-control; }
-                    Switch { text: "Motion sync"; checked <=> root.motion-sync; }
-                    Switch { text: "Glass mode"; checked <=> root.glass-mode; }
-                    Switch { text: "Force max fps"; checked <=> root.force-max-fps; }
-                    Switch { text: "Slamclick filter"; checked <=> root.slamclick-filter; }
-                    Switch { text: "Jitter filter"; checked <=> root.jitter-filter; }
+
+                    Tab {
+                        title: "CPI";
+                        VerticalLayout {
+                            padding: 16px;
+                            spacing: 10px;
+                            alignment: start;
+                            SettingRow { label: "Active levels"; SpinBox { minimum: 1; maximum: 4; value <=> root.cpi-levels; } }
+                            SettingRow { label: "CPI 1"; SpinBox { minimum: 50; maximum: 26000; step-size: 50; value <=> root.cpi1; } }
+                            SettingRow { label: "CPI 2"; SpinBox { minimum: 50; maximum: 26000; step-size: 50; value <=> root.cpi2; } }
+                            SettingRow { label: "CPI 3"; SpinBox { minimum: 50; maximum: 26000; step-size: 50; value <=> root.cpi3; } }
+                            SettingRow { label: "CPI 4"; SpinBox { minimum: 50; maximum: 26000; step-size: 50; value <=> root.cpi4; } }
+                        }
+                    }
                 }
             }
 
-            GroupBox {
-                title: "CPI levels";
-                VerticalLayout {
-                    spacing: 6px;
-                    SettingRow { label: "Active levels"; SpinBox { minimum: 1; maximum: 4; value <=> root.cpi-levels; } }
-                    SettingRow { label: "CPI 1"; SpinBox { minimum: 50; maximum: 26000; step-size: 50; value <=> root.cpi1; } }
-                    SettingRow { label: "CPI 2"; SpinBox { minimum: 50; maximum: 26000; step-size: 50; value <=> root.cpi2; } }
-                    SettingRow { label: "CPI 3"; SpinBox { minimum: 50; maximum: 26000; step-size: 50; value <=> root.cpi3; } }
-                    SettingRow { label: "CPI 4"; SpinBox { minimum: 50; maximum: 26000; step-size: 50; value <=> root.cpi4; } }
-                }
-            }
-
-            GroupBox {
-                title: "Buttons";
-                VerticalLayout {
-                    spacing: 6px;
-                    HorizontalLayout {
-                        spacing: 8px;
-                        Text { text: "Button"; width: 90px; color: #a0a0a0; }
-                        Text { text: "Action"; width: 130px; color: #a0a0a0; }
-                        Text { text: "Setting"; horizontal-stretch: 1; color: #a0a0a0; }
-                        Text { text: "Debounce"; width: 90px; color: #a0a0a0; }
-                    }
-                    for btn in root.buttons : HorizontalLayout {
-                        spacing: 8px;
-                        Text { text: btn.name; width: 90px; vertical-alignment: center; }
-                        ComboBox {
-                            width: 130px;
-                            model: ["Mouse", "Scroll", "Key", "CPI cycle", "CPI shift", "Media", "Disabled"];
-                            current-index <=> btn.kind;
-                        }
-                        HorizontalLayout {
-                            horizontal-stretch: 1;
-                            if btn.kind == 0 : ComboBox {
-                                model: ["left", "right", "middle", "back", "forward"];
-                                current-index <=> btn.mouse;
-                            }
-                            if btn.kind == 1 : ComboBox {
-                                model: ["up", "down"];
-                                current-index <=> btn.scroll;
-                            }
-                            if btn.kind == 2 : LineEdit {
-                                placeholder-text: "e.g. f5 or ctrl+c";
-                                text <=> btn.key;
-                            }
-                            if btn.kind == 4 : SpinBox {
-                                minimum: 50; maximum: 26000; step-size: 50;
-                                value <=> btn.cpi;
-                            }
-                            if btn.kind == 5 : ComboBox {
-                                model: ["play-pause", "next", "previous", "mute", "volume-up", "volume-down", "browser", "explorer"];
-                                current-index <=> btn.media;
-                            }
-                            if btn.kind == 3 || btn.kind == 6 : Text { text: "—"; vertical-alignment: center; }
-                        }
-                        SpinBox {
-                            width: 90px;
-                            minimum: 0; maximum: 25;
-                            enabled: btn.spdt == "off";
-                            value <=> btn.debounce;
-                        }
-                    }
-                    Switch { text: "Allow remapping the left button"; checked <=> root.allow-left-remap; }
-                }
-            }
-
+            // Bottom bar
             HorizontalLayout {
                 spacing: 8px;
                 Text {
