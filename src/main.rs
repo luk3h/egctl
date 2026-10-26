@@ -1,7 +1,4 @@
 mod cli;
-mod device;
-mod protocol;
-mod types;
 
 use std::io::{self, Write};
 
@@ -9,8 +6,8 @@ use anyhow::{bail, Result};
 use clap::Parser;
 
 use cli::*;
-use device::Device;
-use types::*;
+use egctl::device::{self, Device};
+use egctl::types::*;
 
 fn main() -> Result<()> {
 	let cli = Cli::parse();

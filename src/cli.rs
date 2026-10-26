@@ -2,8 +2,8 @@ use std::str::FromStr;
 
 use clap::{Parser, Subcommand, ValueEnum};
 
-use crate::protocol::BUTTON_COUNT;
-use crate::types::{key_code, modifier_bit};
+use egctl::protocol::BUTTON_COUNT;
+use egctl::types::{key_code, modifier_bit};
 
 #[derive(Parser)]
 #[command(
