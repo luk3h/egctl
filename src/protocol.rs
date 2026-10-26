@@ -48,6 +48,7 @@ pub const MAP_MOUSE: i8 = 0;
 pub const MAP_SCROLL: i8 = 1;
 pub const MAP_KEYBOARD: i8 = 2;
 pub const MAP_CPI_LOOP: i8 = 9;
+pub const CPI_LOOP_VALUE: u8 = 0xF1;
 pub const MAP_CPI: i8 = 12;
 pub const MAP_MEDIA: i8 = 32;
 pub const MAP_DISABLE: i8 = -1;

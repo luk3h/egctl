@@ -305,7 +305,7 @@ mod tests {
 			(0, MAP_MOUSE as u8, MOUSE_MIDDLE),
 			(0, MAP_MOUSE as u8, MOUSE_FORWARD),
 			(0, MAP_MOUSE as u8, MOUSE_BACK),
-			(0, MAP_CPI_LOOP as u8, 0),
+			(0, MAP_CPI_LOOP as u8, CPI_LOOP_VALUE),
 			(0, MAP_SCROLL as u8, 1),
 			(0, MAP_DISABLE as u8, 0),
 		];
