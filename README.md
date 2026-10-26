@@ -1,6 +1,6 @@
-# egctl
+# egctl: Endgame Gear OP1 8k v2 on Linux
 
-Configure the **Endgame Gear OP1 8k v2** mouse on Linux, from the command line or a graphical app.
+Configure the **Endgame Gear OP1 8k v2** gaming mouse on Linux: DPI, polling rate up to 8000 Hz, lift-off settings and button remapping, from a desktop app or the command line. No Windows needed.
 
 This is a fork of [egctl by Creations](https://heliopolis.live/creations/egctl) that adds:
 
