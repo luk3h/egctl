@@ -1,9 +1,9 @@
 use egctl::device::Device;
 use egctl::types::config::BUTTON_NAMES;
-use egctl::types::{on_off, SpdtMode};
+use egctl::types::{validate_dpi, MouseConfig, PollingRate, SpdtMode};
 
 slint::slint! {
-    import { Button, GroupBox, VerticalBox } from "std-widgets.slint";
+    import { Button, GroupBox, VerticalBox, ComboBox, Switch, SpinBox } from "std-widgets.slint";
 
     export struct Row {
         label: string,
@@ -19,17 +19,41 @@ slint::slint! {
         }
     }
 
+    component SettingRow inherits HorizontalLayout {
+        in property <string> label;
+        spacing: 8px;
+        Text { text: root.label; width: 140px; color: #a0a0a0; vertical-alignment: center; }
+        @children
+    }
+
     export component MainWindow inherits Window {
         title: "egctl";
-        preferred-width: 440px;
-        preferred-height: 720px;
+        preferred-width: 460px;
+        preferred-height: 900px;
 
         in property <string> firmware;
         in property <string> status;
-        in property <[Row]> general;
-        in property <[Row]> cpis;
+        in property <bool> status-error;
+        in property <string> lod-text;
         in property <[Row]> buttons;
+
+        in-out property <int> polling-index;
+        in-out property <bool> angle-snapping;
+        in-out property <bool> ripple-control;
+        in-out property <bool> motion-sync;
+        in-out property <bool> glass-mode;
+        in-out property <bool> force-max-fps;
+        in-out property <bool> slamclick-filter;
+        in-out property <bool> jitter-filter;
+
+        in-out property <int> cpi-levels;
+        in-out property <int> cpi1;
+        in-out property <int> cpi2;
+        in-out property <int> cpi3;
+        in-out property <int> cpi4;
+
         callback refresh();
+        callback apply();
 
         VerticalBox {
             HorizontalLayout {
@@ -41,58 +65,77 @@ slint::slint! {
                     vertical-alignment: center;
                     horizontal-stretch: 1;
                 }
-                Button { text: "Refresh"; clicked => { root.refresh(); } }
             }
             Text { text: root.firmware; color: #a0a0a0; }
-            if root.status != "" : Text { text: root.status; color: #e05050; wrap: word-wrap; }
-            GroupBox { title: "General"; RowList { rows: root.general; } }
-            GroupBox { title: "CPI levels"; RowList { rows: root.cpis; } }
-            GroupBox { title: "Buttons"; RowList { rows: root.buttons; } }
+
+            GroupBox {
+                title: "General";
+                VerticalLayout {
+                    spacing: 6px;
+                    SettingRow {
+                        label: "Polling rate";
+                        ComboBox {
+                            model: ["1000 Hz", "2000 Hz", "4000 Hz", "8000 Hz"];
+                            current-index <=> root.polling-index;
+                        }
+                    }
+                    SettingRow {
+                        label: "Lift-off distance";
+                        Text { text: root.lod-text + "  (read-only for now)"; vertical-alignment: center; }
+                    }
+                    Switch { text: "Angle snapping"; checked <=> root.angle-snapping; }
+                    Switch { text: "Ripple control"; checked <=> root.ripple-control; }
+                    Switch { text: "Motion sync"; checked <=> root.motion-sync; }
+                    Switch { text: "Glass mode"; checked <=> root.glass-mode; }
+                    Switch { text: "Force max fps"; checked <=> root.force-max-fps; }
+                    Switch { text: "Slamclick filter"; checked <=> root.slamclick-filter; }
+                    Switch { text: "Jitter filter"; checked <=> root.jitter-filter; }
+                }
+            }
+
+            GroupBox {
+                title: "CPI levels";
+                VerticalLayout {
+                    spacing: 6px;
+                    SettingRow { label: "Active levels"; SpinBox { minimum: 1; maximum: 4; value <=> root.cpi-levels; } }
+                    SettingRow { label: "CPI 1"; SpinBox { minimum: 50; maximum: 26000; step-size: 50; value <=> root.cpi1; } }
+                    SettingRow { label: "CPI 2"; SpinBox { minimum: 50; maximum: 26000; step-size: 50; value <=> root.cpi2; } }
+                    SettingRow { label: "CPI 3"; SpinBox { minimum: 50; maximum: 26000; step-size: 50; value <=> root.cpi3; } }
+                    SettingRow { label: "CPI 4"; SpinBox { minimum: 50; maximum: 26000; step-size: 50; value <=> root.cpi4; } }
+                }
+            }
+
+            GroupBox {
+                title: "Buttons (read-only for now)";
+                RowList { rows: root.buttons; }
+            }
+
+            HorizontalLayout {
+                spacing: 8px;
+                Text {
+                    text: root.status;
+                    color: root.status-error ? #e05050 : #50c060;
+                    wrap: word-wrap;
+                    vertical-alignment: center;
+                    horizontal-stretch: 1;
+                }
+                Button { text: "Revert"; clicked => { root.refresh(); } }
+                Button { text: "Apply"; primary: true; clicked => { root.apply(); } }
+            }
         }
     }
 }
 
-struct Snapshot {
-    firmware: String,
-    general: Vec<(String, String)>,
-    cpis: Vec<(String, String)>,
-    buttons: Vec<(String, String)>,
-}
-
-/// Read everything from the mouse. Read-only: nothing here writes to the device.
-fn read_mouse() -> anyhow::Result<Snapshot> {
+/// Read the mouse. Read-only.
+fn read_mouse() -> anyhow::Result<(String, MouseConfig)> {
     let dev = Device::open()?;
     let (major, minor) = dev.get_firmware_version()?;
-    let c = dev.read_config()?;
+    let config = dev.read_config()?;
+    Ok((format!("Firmware {minor:x}.{major:x}"), config))
+}
 
-    let general: Vec<(String, String)> = vec![
-        ("Polling rate".into(), c.polling_rate.to_string()),
-        ("Lift-off distance".into(), c.lod.to_string()),
-        ("Angle snapping".into(), on_off(c.angle_snapping).into()),
-        ("Ripple control".into(), on_off(c.ripple_control).into()),
-        ("Motion sync".into(), on_off(c.motion_sync).into()),
-        ("Glass mode".into(), on_off(c.glass_mode).into()),
-        ("Force max fps".into(), on_off(c.force_max_fps).into()),
-        ("Slamclick filter".into(), on_off(c.slamclick_filter).into()),
-        ("Jitter filter".into(), on_off(c.jitter_filter).into()),
-    ];
-
-    let cpis = c
-    .cpis
-    .iter()
-    .enumerate()
-    .map(|(i, cpi)| {
-        let value = if cpi.xy_split {
-            format!("X={} Y={}", cpi.x, cpi.y)
-        } else {
-            cpi.x.to_string()
-        };
-        let active = if (i as u8) < c.cpi_levels { "" } else { "  (inactive)" };
-        (format!("CPI {}", i + 1), format!("{value}{active}"))
-    })
-    .collect();
-
-    let buttons = c
+fn buttons_model(c: &MouseConfig) -> slint::ModelRc<Row> {
+    let rows: Vec<Row> = c
     .buttons
     .iter()
     .zip(BUTTON_NAMES.iter())
@@ -103,40 +146,90 @@ fn read_mouse() -> anyhow::Result<Snapshot> {
         } else if b.multiclick > 0 {
             value += &format!("  ·  debounce {}", b.multiclick);
         }
-        (name.to_string(), value)
-    })
-    .collect();
-
-    Ok(Snapshot {
-        firmware: format!("Firmware {minor:x}.{major:x}"),
-       general,
-       cpis,
-       buttons,
-    })
-}
-
-fn to_model(rows: Vec<(String, String)>) -> slint::ModelRc<Row> {
-    let rows: Vec<Row> = rows
-    .into_iter()
-    .map(|(label, value)| Row {
-        label: label.into(),
+        Row {
+            label: (*name).into(),
          value: value.into(),
+        }
     })
     .collect();
     slint::ModelRc::new(slint::VecModel::from(rows))
 }
 
-fn load(ui: &MainWindow) {
+/// Copy the mouse's settings into the window.
+fn fill(ui: &MainWindow, firmware: String, c: &MouseConfig) {
+    ui.set_firmware(firmware.into());
+    ui.set_polling_index(match c.polling_rate {
+        PollingRate::Hz1000 => 0,
+        PollingRate::Hz2000 => 1,
+        PollingRate::Hz4000 => 2,
+        PollingRate::Hz8000 => 3,
+    });
+    ui.set_lod_text(c.lod.to_string().into());
+    ui.set_angle_snapping(c.angle_snapping);
+    ui.set_ripple_control(c.ripple_control);
+    ui.set_motion_sync(c.motion_sync);
+    ui.set_glass_mode(c.glass_mode);
+    ui.set_force_max_fps(c.force_max_fps);
+    ui.set_slamclick_filter(c.slamclick_filter);
+    ui.set_jitter_filter(c.jitter_filter);
+    ui.set_cpi_levels(c.cpi_levels as i32);
+    ui.set_cpi1(c.cpis[0].x as i32);
+    ui.set_cpi2(c.cpis[1].x as i32);
+    ui.set_cpi3(c.cpis[2].x as i32);
+    ui.set_cpi4(c.cpis[3].x as i32);
+    ui.set_buttons(buttons_model(c));
+}
+
+/// Reload from the mouse. Returns true if it worked.
+fn load(ui: &MainWindow) -> bool {
     match read_mouse() {
-        Ok(s) => {
-            ui.set_status("".into());
-            ui.set_firmware(s.firmware.into());
-            ui.set_general(to_model(s.general));
-            ui.set_cpis(to_model(s.cpis));
-            ui.set_buttons(to_model(s.buttons));
+        Ok((firmware, config)) => {
+            fill(ui, firmware, &config);
+            ui.set_status_error(false);
+            ui.set_status("Loaded from mouse".into());
+            true
         }
-        Err(e) => ui.set_status(format!("{e:#}").into()),
+        Err(e) => {
+            ui.set_status_error(true);
+            ui.set_status(format!("{e:#}").into());
+            false
+        }
     }
+}
+
+/// Read fresh, change only what the window shows, write back.
+fn apply(ui: &MainWindow) -> anyhow::Result<()> {
+    let dev = Device::open()?;
+    let mut c = dev.read_config()?;
+
+    c.polling_rate = match ui.get_polling_index() {
+        1 => PollingRate::Hz2000,
+        2 => PollingRate::Hz4000,
+        3 => PollingRate::Hz8000,
+        _ => PollingRate::Hz1000,
+    };
+    c.angle_snapping = ui.get_angle_snapping();
+    c.ripple_control = ui.get_ripple_control();
+    c.motion_sync = ui.get_motion_sync();
+    c.glass_mode = ui.get_glass_mode();
+    c.force_max_fps = ui.get_force_max_fps();
+    c.slamclick_filter = ui.get_slamclick_filter();
+    c.jitter_filter = ui.get_jitter_filter();
+
+    c.cpi_levels = ui.get_cpi_levels().clamp(1, 4) as u8;
+    let values = [ui.get_cpi1(), ui.get_cpi2(), ui.get_cpi3(), ui.get_cpi4()];
+    for (i, v) in values.iter().enumerate() {
+        // Levels with separate X/Y values aren't editable here yet, so leave them alone.
+        if c.cpis[i].xy_split {
+            continue;
+        }
+        let dpi = validate_dpi((*v).clamp(50, 26000) as u16)?;
+        c.cpis[i].x = dpi;
+        c.cpis[i].y = dpi;
+    }
+
+    dev.write_config(&c)?;
+    Ok(())
 }
 
 fn main() -> Result<(), slint::PlatformError> {
@@ -147,6 +240,23 @@ fn main() -> Result<(), slint::PlatformError> {
     ui.on_refresh(move || {
         if let Some(ui) = weak.upgrade() {
             load(&ui);
+        }
+    });
+
+    let weak = ui.as_weak();
+    ui.on_apply(move || {
+        if let Some(ui) = weak.upgrade() {
+            match apply(&ui) {
+                Ok(()) => {
+                    if load(&ui) {
+                        ui.set_status("Saved to mouse".into());
+                    }
+                }
+                Err(e) => {
+                    ui.set_status_error(true);
+                    ui.set_status(format!("Save failed: {e:#}").into());
+                }
+            }
         }
     });
 
